@@ -1,5 +1,5 @@
 import { atom } from 'jotai'
-import { loadAtlasData } from '../data/atlasRepository'
+import { loadAtlasData, loadCldrData } from '../data/atlasRepository'
 import type {
   GeographyDatasetSelection,
   GeometryVariantId,
@@ -8,6 +8,7 @@ import type {
 } from '../domain/atlas'
 
 export const atlasDataAtom = atom(async () => loadAtlasData())
+export const cldrDataAtom = atom(async () => loadCldrData())
 
 export const languageQueryAtom = atom('')
 export const geographyDatasetFilterAtom = atom<GeographyDatasetSelection>('all')

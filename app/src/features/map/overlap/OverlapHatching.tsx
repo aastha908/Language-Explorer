@@ -48,6 +48,7 @@ const installPatterns = (
   colors: ReadonlyMap<string, string>,
   ownedPatterns: Set<string>,
 ) => {
+  if (!map.isStyleLoaded()) throw new Error('Map style is not ready to draw overlap stripes.')
   const uniquePatterns = new Map(properties.map((properties) => [properties.pattern, properties]))
   const pixels = [...uniquePatterns.values()].reduce(
     (sum, { variantIds }) => sum + patternPixels(variantIds.length),
@@ -84,11 +85,21 @@ export const OverlapHatching = ({
   selectionKey,
   coverageReady,
   onCoverageReady,
+  targetLayerId = 'selected-language-areas',
+  inspectionLayerId = INSPECTION_LAYER,
+  beforeId,
+  showControls = true,
+  onStatus,
 }: {
   readonly variants: readonly GeometryVariant[]
   readonly selectionKey: string
   readonly coverageReady: boolean
   readonly onCoverageReady: (key: string | null) => void
+  readonly targetLayerId?: string
+  readonly inspectionLayerId?: string
+  readonly beforeId?: string
+  readonly showControls?: boolean
+  readonly onStatus?: (status: HatchingState['status'], message: string) => void
 }) => {
   const { current } = useMap()
   const map = current?.getMap()
@@ -106,6 +117,10 @@ export const OverlapHatching = ({
   })
   const configRef = useRef({ selectionKey, mode })
   const refreshRef = useRef<(() => void) | null>(null)
+
+  useEffect(() => {
+    onStatus?.(state.status, state.message)
+  }, [onStatus, state.message, state.status])
 
   useEffect(() => {
     if (!diagnosticsEnabled || !map) return
@@ -142,9 +157,9 @@ export const OverlapHatching = ({
       for (const buffer of BUFFERS) {
         for (const id of [`${OVERLAP_LAYER}-${buffer}`, `${FALLBACK_SOURCE}-${buffer}`]) {
           const overlapIndex = layers.indexOf(id)
-          const inspectionIndex = layers.indexOf(INSPECTION_LAYER)
+          const inspectionIndex = layers.indexOf(inspectionLayerId)
           if (overlapIndex >= 0 && inspectionIndex >= 0 && overlapIndex > inspectionIndex) {
-            map.moveLayer(id, INSPECTION_LAYER)
+            map.moveLayer(id, inspectionLayerId)
           }
         }
       }
@@ -154,7 +169,7 @@ export const OverlapHatching = ({
     return () => {
       map.off('styledata', syncLayerOrder)
     }
-  }, [map])
+  }, [map, inspectionLayerId])
 
   useEffect(() => {
     if (!map) return
@@ -333,7 +348,7 @@ export const OverlapHatching = ({
     }
 
     const refresh = () => {
-      if (!map.getLayer('selected-language-areas')) return
+      if (!map.getLayer(targetLayerId)) return
       const config = configRef.current
       const variantIds: string[] = config.mode === 'hatching' ? JSON.parse(config.selectionKey) : []
       const bounds = map.getBounds()
@@ -485,6 +500,7 @@ export const OverlapHatching = ({
       setState((previous) => ({ ...previous, status: 'error', message: failure }))
     }
     const prunePatterns = () => {
+      if (!map.isStyleLoaded()) return
       const sources = BUFFERS.map((buffer) => `${OVERLAP_SOURCE}-${buffer}`)
       if (sources.some((id) => map.getSource(id) && !map.isSourceLoaded(id))) return
       const referencedPatterns = new Set(
@@ -524,9 +540,10 @@ export const OverlapHatching = ({
       map.off('idle', schedule)
       map.off('sourcedata', publishCoverage)
       map.off('idle', publishCoverage)
-      for (const id of ownedPatterns) if (map.hasImage(id)) map.removeImage(id)
+      if (map.isStyleLoaded())
+        for (const id of ownedPatterns) if (map.hasImage(id)) map.removeImage(id)
     }
-  }, [map, data, onCoverageReady])
+  }, [map, data, onCoverageReady, targetLayerId])
 
   useEffect(() => {
     configRef.current = { selectionKey, mode }
@@ -560,6 +577,7 @@ export const OverlapHatching = ({
                   id={`${OVERLAP_LAYER}-${buffer}`}
                   source-layer={COVERAGE_LAYER}
                   type="fill"
+                  {...(beforeId ? { beforeId } : {})}
                   paint={{
                     'fill-pattern': ['get', 'pattern'],
                     'fill-opacity': 1,
@@ -582,6 +600,7 @@ export const OverlapHatching = ({
                   source-layer={data.manifest.vectorLayer}
                   type="fill"
                   filter={['in', ['get', 'variant_id'], ['literal', variants.map(({ id }) => id)]]}
+                  {...(beforeId ? { beforeId } : {})}
                   paint={{
                     'fill-color': ['get', 'color'],
                     'fill-opacity': 1,
@@ -596,46 +615,48 @@ export const OverlapHatching = ({
           )
         )
       })}
-      <div className="map-overlap-control">
-        <label>
-          <span>Overlapping languages</span>
-          <select
-            value={mode}
-            onChange={(event) =>
-              setMode(event.currentTarget.value === 'blending' ? 'blending' : 'hatching')
-            }
-          >
-            <option value="hatching">Alternating stripes</option>
-            <option value="blending">Color blending</option>
-          </select>
-        </label>
-        {mode === 'hatching' && (
-          <label className="map-opacity-control" htmlFor="language-opacity">
-            <span>
-              Color strength{' '}
-              <output htmlFor="language-opacity">{Math.round(opacity * 100)}%</output>
-            </span>
-            <input
-              id="language-opacity"
-              type="range"
-              min="40"
-              max="100"
-              value={Math.round(opacity * 100)}
-              onChange={(event) => setOpacity(Number(event.currentTarget.value) / 100)}
-            />
+      {showControls && (
+        <div className="map-overlap-control">
+          <label>
+            <span>Overlapping languages</span>
+            <select
+              value={mode}
+              onChange={(event) =>
+                setMode(event.currentTarget.value === 'blending' ? 'blending' : 'hatching')
+              }
+            >
+              <option value="hatching">Alternating stripes</option>
+              <option value="blending">Color blending</option>
+            </select>
           </label>
-        )}
-        <button type="button" onClick={showExample}>
-          Try Britain example
-        </button>
-        <p role="status" data-overlap-status={state.status}>
-          {mode === 'blending'
-            ? 'Overlapping colors are blended'
-            : variants.length < 2
-              ? 'Select two or more languages, or try the example'
-              : state.message || 'Preparing overlap stripes…'}
-        </p>
-      </div>
+          {mode === 'hatching' && (
+            <label className="map-opacity-control" htmlFor="language-opacity">
+              <span>
+                Color strength{' '}
+                <output htmlFor="language-opacity">{Math.round(opacity * 100)}%</output>
+              </span>
+              <input
+                id="language-opacity"
+                type="range"
+                min="40"
+                max="100"
+                value={Math.round(opacity * 100)}
+                onChange={(event) => setOpacity(Number(event.currentTarget.value) / 100)}
+              />
+            </label>
+          )}
+          <button type="button" onClick={showExample}>
+            Try Britain example
+          </button>
+          <p role="status" data-overlap-status={state.status}>
+            {mode === 'blending'
+              ? 'Overlapping colors are blended'
+              : variants.length < 2
+                ? 'Select two or more languages, or try the example'
+                : state.message || 'Preparing overlap stripes…'}
+          </p>
+        </div>
+      )}
     </>
   )
 }

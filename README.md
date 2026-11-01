@@ -49,6 +49,59 @@ npm run typecheck
 npm run build
 ```
 
+## CLDR demographics view
+
+The **CLDR demographics** tab uses the preprocessed
+`cldr_glottolog_joined.csv` file. By default, the exporter expects it in the
+sibling folder `../UNICODE-cldr/`:
+
+```sh
+python ./pipeline/atlas/build_cldr.py
+```
+
+If the CSV is elsewhere, pass its path explicitly:
+
+```sh
+python ./pipeline/atlas/build_cldr.py --source "C:/path/to/cldr_glottolog_joined.csv"
+```
+
+The exporter writes `app/public/data/cldr-language-demographics.json`, which
+is generated and ignored by Git. It checks every CLDR Glottocode against the
+pinned Glottolog catalog, uses Glottolog's canonical spelling and level, and
+maps dialect rows to their language parent for area overlays. Family-level
+rows remain point-only because they do not have a language-level polygon. Run
+the exporter again whenever the source CSV changes.
+The map uses CARTO's OpenStreetMap-based Voyager style for country and city
+labels, so this tab needs an internet connection and displays its attribution.
+Country markers use the higher-resolution country boundary data, including
+small countries such as Bahrain; when a territory boundary is unavailable,
+the map does not substitute a language-origin coordinate for its location.
+At global zoom, family bubbles are the only demographic overlays until a
+selection is made. Regional zoom shows country pies colored by official status;
+selecting a pie enlarges it and highlights only its languages' Glottolog origin
+areas. A country search fits and outlines the whole country, while a language
+search highlights its reporting territories and shows only that language's
+colored atlas area and origin point. At local zoom, selected language origins
+use small coordinate markers. Pie-selected language areas use the same atlas
+colors and overlap stripes as the Language areas view; language origins and
+speaker territories remain distinct locations. Pie-selected area patches are
+masked to the selected country, and hovering a patch shows its language, family,
+population share, and official status. The global map disables world copies so
+the atlas is framed once without repeated edge geometry.
+Country shading can switch between a normalized language-diversity index
+(computed from the reported population shares) and territory literacy when a
+country is selected.
+The map also reuses the atlas's language-area archive. Choose a geography
+source and period to compare the Asher, Wurm–Hattori, Matsumae, DiACL, and
+Bouckaert datasets without changing the existing Language areas tab. The
+all-sources option chooses one available polygon per CLDR-linked Glottolog
+language, preferring contemporary atlas sources when the selected period allows.
+Repeated CLDR script codes for the same territory and Glottocode are collapsed
+to the largest speaker estimate rather than double-counted.
+CLDR speaker estimates may overlap in multilingual populations; totals are
+shown as reported estimates, not deduplicated people. WALS phonology and DiACL
+vocabulary links remain unavailable until those views are implemented.
+
 ## Overlap hatching proof of concept
 
 The map defaults to **Alternating stripes**: shared areas cycle through the

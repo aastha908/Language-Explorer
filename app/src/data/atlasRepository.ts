@@ -5,6 +5,7 @@ import type {
   GeometryVariant,
   Language,
 } from '../domain/atlas'
+import type { CldrObservation } from '../domain/cldr'
 
 const dataUrl = (fileName: string) => `${import.meta.env.BASE_URL}data/${fileName}`
 
@@ -62,6 +63,13 @@ export const loadAtlasData = (): Promise<AtlasData> => {
   })
 
   return atlasDataPromise
+}
+
+let cldrDataPromise: Promise<readonly CldrObservation[]> | undefined
+
+export const loadCldrData = (): Promise<readonly CldrObservation[]> => {
+  cldrDataPromise ??= fetchJson<readonly CldrObservation[]>('cldr-language-demographics.json')
+  return cldrDataPromise
 }
 
 export const normalizeLanguageQuery = normalizeSearchText
