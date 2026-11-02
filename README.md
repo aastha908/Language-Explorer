@@ -49,11 +49,18 @@ npm run typecheck
 npm run build
 ```
 
+## Publish with GitHub Pages
+
+The `aastha/speaker-stats` branch deploys through GitHub Actions. In the
+repository settings, set **Pages → Build and deployment → Source** to
+**GitHub Actions**. Pushing to that branch runs the deployment workflow, which
+generates the atlas and CLDR data before building the site.
+
 ## CLDR demographics view
 
 The **CLDR demographics** tab uses the preprocessed
-`cldr_glottolog_joined.csv` file. By default, the exporter expects it in the
-sibling folder `../UNICODE-cldr/`:
+`pipeline/atlas/data/cldr_glottolog_joined.csv` file, which is tracked in this
+repository so the web data can be regenerated from a clean clone:
 
 ```sh
 python ./pipeline/atlas/build_cldr.py

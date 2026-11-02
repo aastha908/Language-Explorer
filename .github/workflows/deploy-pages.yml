@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches: ['aastha/speaker-stats']
   workflow_dispatch:
 
 permissions:
@@ -49,6 +49,9 @@ jobs:
       - name: Generate atlas data
         run: uv run --frozen python -m pipeline.atlas.build
 
+      - name: Generate CLDR demographics data
+        run: uv run --frozen python ./pipeline/atlas/build_cldr.py
+
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -68,6 +71,7 @@ jobs:
         working-directory: app
         env:
           GITHUB_PAGES: 'true'
+          GITHUB_PAGES_BASE: '/${{ github.event.repository.name }}/'
         run: npm run build
 
       - name: Configure GitHub Pages
